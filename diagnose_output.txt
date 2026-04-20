@@ -1,0 +1,11 @@
+DOM_ID_MAP = {
+    "SEN_Harta_CONS_value": "consum",
+    "SEN_Harta_PROD_value": "productie",
+    "SEN_Harta_CARB_value": "carbune",
+    "SEN_Harta_GAZE_value": "hidrocarburi",
+    "SEN_Harta_APE_value": "hidro",
+    "SEN_Harta_NUCL_value": "nuclear",
+    "SEN_Harta_EOLIAN_value": "eolian",
+    "SEN_Harta_FOTO_value": "fotovoltaic",
+    "SEN_Harta_SOLD_value": "sold",
+}

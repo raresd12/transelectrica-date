@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEN România — Monitor Producție Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset & Variables ─────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:        #0f1117;
+  --surface:   #161b27;
+  --surface2:  #1c2333;
+  --border:    #242d40;
+  --blue:      #1e6fff;
+  --blue-dim:  rgba(30,111,255,0.15);
+  --blue-row:  rgba(30,111,255,0.12);
+  --green:     #2dd87a;
+  --red:       #ff4f4f;
+  --yellow:    #f5c842;
+  --text:      #dce6f0;
+  --muted:     #5a6a82;
+  --mono:      'IBM Plex Mono', monospace;
+  --sans:      'IBM Plex Sans', sans-serif;
+}
+
+html, body { height: 100%; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* ─── Layout ────────────────────────────────────────────────── */
+.page { max-width: 1280px; margin: 0 auto; padding: 24px 20px 48px; }
+
+/* ─── Header ────────────────────────────────────────────────── */
+header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 28px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.header-left h1 {
+  font-family: var(--sans);
+  font-weight: 700;
+  font-size: 1.35rem;
+  letter-spacing: -0.01em;
+  color: #fff;
+}
+
+.header-left p {
+  font-size: 0.78rem;
+  color: var(--muted);
+  margin-top: 3px;
+  letter-spacing: 0.04em;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+/* Status pill */
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 2px;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  border: 1px solid;
+  transition: all 0.3s;
+}
+
+.status-pill.online {
+  border-color: var(--green);
+  color: var(--green);
+  background: rgba(45,216,122,0.07);
+}
+
+.status-pill.error {
+  border-color: var(--red);
+  color: var(--red);
+  background: rgba(255,79,79,0.07);
+}
+
+.status-pill.init {
+  border-color: var(--yellow);
+  color: var(--yellow);
+  background: rgba(245,200,66,0.07);
+}
+
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.status-dot.blink { animation: blink 1.4s ease infinite; }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+
+/* Meta info */
+.meta {
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+  text-align: right;
+  line-height: 1.8;
+}
+
+/* ─── Section title ─────────────────────────────────────────── */
+.section-label {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.section-label::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ─── Table wrapper ─────────────────────────────────────────── */
+.table-wrap {
+  width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  margin-bottom: 32px;
+}
+
+/* ─── Table ──────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  white-space: nowrap;
+}
+
+thead th {
+  background: var(--surface2);
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 0.68rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 11px 14px;
+  text-align: right;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+thead th:first-child { text-align: left; }
+
+tbody tr { transition: background 0.15s; }
+
+tbody td {
+  padding: 10px 14px;
+  text-align: right;
+  border-bottom: 1px solid rgba(36,45,64,0.6);
+  color: var(--text);
+}
+
+tbody td:first-child {
+  text-align: left;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* Alternate rows */
+tbody tr:nth-child(even) td { background: rgba(255,255,255,0.015); }
+
+/* Hover */
+tbody tr:not(.live-row):hover td {
+  background: rgba(255,255,255,0.03);
+}
+
+/* ─── Live row ──────────────────────────────────────────────── */
+.live-row td {
+  background: var(--blue-row) !important;
+  color: #fff !important;
+  font-weight: 600;
+}
+
+.live-row td:first-child {
+  color: var(--blue) !important;
+  font-weight: 700;
+}
+
+/* Pulse animation on live row update */
+.live-row.pulse td {
+  animation: rowPulse 0.6s ease;
+}
+
+@keyframes rowPulse {
+  0%   { background: rgba(30,111,255,0.35) !important; }
+  100% { background: var(--blue-row) !important; }
+}
+
+/* ─── Values ─────────────────────────────────────────────────── */
+.val-null { color: var(--muted); }
+
+/* ─── Countdown bar ─────────────────────────────────────────── */
+.countdown-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.countdown-label {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.countdown-bar-bg {
+  flex: 1;
+  height: 3px;
+  background: var(--border);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.countdown-bar-fill {
+  height: 100%;
+  background: var(--blue);
+  border-radius: 2px;
+  transition: width 1s linear;
+}
+
+#countdown-seconds {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--blue);
+  width: 24px;
+  text-align: right;
+}
+
+/* ─── Error banner ──────────────────────────────────────────── */
+#error-banner {
+  display: none;
+  background: rgba(255,79,79,0.08);
+  border: 1px solid rgba(255,79,79,0.3);
+  border-left: 3px solid var(--red);
+  padding: 10px 14px;
+  margin-bottom: 16px;
+  font-size: 0.77rem;
+  color: var(--red);
+  font-family: var(--mono);
+}
+
+/* ─── Empty state ───────────────────────────────────────────── */
+.empty-row td {
+  text-align: center !important;
+  color: var(--muted);
+  padding: 32px;
+  font-family: var(--sans);
+  font-size: 0.82rem;
+}
+
+/* ─── Responsive ────────────────────────────────────────────── */
+@media (max-width: 700px) {
+  header { flex-direction: column; }
+  .meta { text-align: left; }
+  .header-right { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <header>
+    <div class="header-left">
+      <h1>⚡ SEN România — Monitor Producție Live</h1>
+      <p>Sursa: Transelectrica · widget SEN Hartă · citire la 20 secunde</p>
+    </div>
+    <div class="header-right">
+      <div id="status-pill" class="status-pill init">
+        <span class="status-dot blink"></span>
+        <span id="status-text">Inițializare...</span>
+      </div>
+      <div class="meta">
+        <div>Ultima actualizare: <span id="last-sync">—</span></div>
+        <div>Citiri totale sesiune: <span id="total-readings">0</span></div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ERROR BANNER -->
+  <div id="error-banner"></div>
+
+  <!-- COUNTDOWN -->
+  <div class="countdown-wrap">
+    <span class="countdown-label">Următorul refresh live:</span>
+    <div class="countdown-bar-bg">
+      <div class="countdown-bar-fill" id="countdown-fill" style="width:100%"></div>
+    </div>
+    <span id="countdown-seconds">20</span>
+  </div>
+
+  <!-- LIVE ROW SECTION -->
+  <div class="section-label">Citire curentă (live)</div>
+  <div class="table-wrap" style="margin-bottom:20px;">
+    <table>
+      <thead>
+        <tr>
+          <th>Ora</th>
+          <th>Cărbune<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Hidrocarburi<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Hidro<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Nuclear<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Eolian<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Fotovoltaic<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Biomasă<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Stocare<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Consum<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Producție<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Sold<br><small style="font-weight:400;opacity:.6">MW</small></th>
+        </tr>
+      </thead>
+      <tbody id="live-tbody">
+        <tr class="empty-row"><td colspan="12">Se încarcă datele live...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- HISTORY SECTION -->
+  <div class="section-label">Istoric ultimele 15 minute (agregat pe minut)</div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Minut</th>
+          <th>Cărbune<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Hidrocarburi<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Hidro<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Nuclear<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Eolian<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Fotovoltaic<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Biomasă<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Stocare<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Consum<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Producție<br><small style="font-weight:400;opacity:.6">MW</small></th>
+          <th>Sold<br><small style="font-weight:400;opacity:.6">MW</small></th>
+        </tr>
+      </thead>
+      <tbody id="history-tbody">
+        <tr class="empty-row"><td colspan="12">Istoricul se populează după primul minut...</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<script>
+const API = "";  // Same origin — Flask servește și frontend-ul
+
+// ─── Utility ─────────────────────────────────────────────────────────────────
+
+function fmtTime(isoStr) {
+  if (!isoStr) return "—";
+  const d = new Date(isoStr);
+  return d.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+}
+
+function fmtMinute(isoStr) {
+  if (!isoStr) return "—";
+  // isoStr poate fi "2025-04-20T14:32" (minute) sau full ISO
+  const d = new Date(isoStr.length === 16 ? isoStr + ":00Z" : isoStr);
+  return d.toLocaleTimeString("ro-RO", { hour: "2-digit", minute: "2-digit" });
+}
+
+function fmtMW(val) {
+  if (val === null || val === undefined) return `<span class="val-null">—</span>`;
+  return Math.round(val).toLocaleString("ro-RO");
+}
+
+const FIELDS = [
+  "carbune", "hidrocarburi", "hidro", "nuclear",
+  "eolian", "fotovoltaic", "biomasa", "stocare",
+  "consum", "productie", "sold"
+];
+
+function buildRow(row, isLive) {
+  const timeStr = isLive ? fmtTime(row.timestamp) : fmtMinute(row.minute || row.timestamp);
+  const cells = FIELDS.map(f => `<td>${fmtMW(row[f])}</td>`).join("");
+  const cls = isLive ? 'class="live-row" id="live-row"' : "";
+  return `<tr ${cls}><td>${timeStr}</td>${cells}</tr>`;
+}
+
+// ─── Status bar ───────────────────────────────────────────────────────────────
+
+function updateStatus(status) {
+  const pill = document.getElementById("status-pill");
+  const text = document.getElementById("status-text");
+  const banner = document.getElementById("error-banner");
+
+  pill.className = "status-pill " + (status.source === "online" ? "online" : status.source === "error" ? "error" : "init");
+
+  const dot = pill.querySelector(".status-dot");
+  dot.className = "status-dot" + (status.source === "online" ? " blink" : "");
+
+  if (status.source === "online") {
+    text.textContent = "ONLINE";
+    banner.style.display = "none";
+  } else if (status.source === "error") {
+    text.textContent = "EROARE SURSĂ";
+    banner.style.display = "block";
+    banner.textContent = "⚠ " + (status.error_msg || "Eroare necunoscută la citirea de la Transelectrica.");
+  } else {
+    text.textContent = "Inițializare...";
+  }
+
+  document.getElementById("last-sync").textContent = status.last_sync ? fmtTime(status.last_sync) : "—";
+  document.getElementById("total-readings").textContent = status.total_readings ?? 0;
+}
+
+// ─── Fetch latest ─────────────────────────────────────────────────────────────
+
+async function fetchLatest() {
+  try {
+    const r = await fetch(API + "/api/latest");
+    if (!r.ok) return;
+    const data = await r.json();
+
+    const tbody = document.getElementById("live-tbody");
+    tbody.innerHTML = buildRow(data, true);
+
+    // Pulse animation
+    const liveRow = document.getElementById("live-row");
+    if (liveRow) {
+      liveRow.classList.remove("pulse");
+      void liveRow.offsetWidth; // reflow
+      liveRow.classList.add("pulse");
+    }
+  } catch (e) {
+    console.warn("fetchLatest error:", e);
+  }
+}
+
+// ─── Fetch history ────────────────────────────────────────────────────────────
+
+async function fetchHistory() {
+  try {
+    const r = await fetch(API + "/api/history?minutes=15");
+    if (!r.ok) return;
+    const rows = await r.json();
+
+    const tbody = document.getElementById("history-tbody");
+    if (!rows.length) {
+      tbody.innerHTML = `<tr class="empty-row"><td colspan="12">Niciun rând istoric disponibil încă.</td></tr>`;
+      return;
+    }
+    tbody.innerHTML = rows.map(row => buildRow(row, false)).join("");
+  } catch (e) {
+    console.warn("fetchHistory error:", e);
+  }
+}
+
+// ─── Fetch status ─────────────────────────────────────────────────────────────
+
+async function fetchStatus() {
+  try {
+    const r = await fetch(API + "/api/status");
+    if (!r.ok) return;
+    const data = await r.json();
+    updateStatus(data);
+  } catch (e) {
+    console.warn("fetchStatus error:", e);
+  }
+}
+
+// ─── Countdown bar ────────────────────────────────────────────────────────────
+
+let countdownVal = 20;
+
+function tickCountdown() {
+  countdownVal--;
+  if (countdownVal < 0) countdownVal = 20;
+
+  const pct = (countdownVal / 20) * 100;
+  document.getElementById("countdown-fill").style.width = pct + "%";
+  document.getElementById("countdown-seconds").textContent = countdownVal;
+}
+
+// ─── Init & loops ─────────────────────────────────────────────────────────────
+
+async function init() {
+  await fetchStatus();
+  await fetchLatest();
+  await fetchHistory();
+}
+
+init();
+
+// Live row: la 20 secunde
+setInterval(async () => {
+  await fetchLatest();
+  await fetchStatus();
+}, 20_000);
+
+// History: la 60 secunde
+setInterval(fetchHistory, 60_000);
+
+// Countdown tick: la fiecare secundă
+setInterval(tickCountdown, 1_000);
+</script>
+</body>
+</html>
